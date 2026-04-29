@@ -324,12 +324,12 @@
 <body>
 
 <div class="header">
-    <div class="sync-indicator" id="syncIndicator"></div>
+    <div class="sync-indicator offline" id="syncIndicator"></div>
     <span id="pageTitle">Lists</span>
 </div>
 
 <div class="sync-status-bar" id="syncStatus">
-    <span id="syncText">Checking connection...</span>
+    <span id="syncText">Initializing...</span>
     <span id="deviceId" style="font-size:10px;opacity:0.5;"></span>
 </div>
 
@@ -356,7 +356,7 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- Modals (same as before) -->
+<!-- Modals -->
 <div class="modal-overlay" id="addClassModal">
     <div class="modal-sheet">
         <div class="modal-header">
@@ -415,56 +415,60 @@
 </div>
 
 <script>
-// ==================== FIREBASE CONFIG ====================
-// REPLACE THESE WITH YOUR OWN FIREBASE PROJECT VALUES
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// Initialize Firebase
+// ==================== GLOBAL STATE ====================
 let db = null;
 let isOnline = false;
 let syncInProgress = false;
 const DEVICE_ID = 'device_' + Math.random().toString(36).substr(2, 9);
-document.getElementById('deviceId').textContent = DEVICE_ID;
-
-try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.database();
-} catch(e) {
-    console.log('Firebase not configured yet');
-}
-
-// ==================== LOCAL STORAGE ====================
 const LOCAL_KEY = 'machine_manager_data';
 const LAST_SYNC_KEY = 'machine_manager_last_sync';
+const FIREBASE_CONFIG_KEY = 'firebase_config_v2';
 
-function getLocalData() {
-    const raw = localStorage.getItem(LOCAL_KEY);
-    if (raw) return JSON.parse(raw);
-    return { classrooms: [], version: 0 };
+let currentTab = 'lists';
+let currentClassroomId = null;
+let lastSearchQuery = '';
+
+// ==================== FIREBASE INIT ====================
+function initFirebase() {
+    const saved = localStorage.getItem(FIREBASE_CONFIG_KEY);
+    if (!saved) {
+        updateSyncStatus('offline', 'Firebase not configured - go to Sync tab');
+        return false;
+    }
+    
+    try {
+        const cfg = JSON.parse(saved);
+        
+        // Check if already initialized
+        if (firebase.apps.length > 0) {
+            firebase.apps.forEach(app => app.delete());
+        }
+        
+        const config = {
+            apiKey: cfg.apiKey,
+            authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com'),
+            databaseURL: cfg.databaseURL,
+            projectId: cfg.projectId,
+            storageBucket: cfg.storageBucket || (cfg.projectId + '.appspot.com'),
+            messagingSenderId: cfg.messagingSenderId || '000000000000',
+            appId: cfg.appId || '1:000000000000:web:0000000000000000000000'
+        };
+        
+        firebase.initializeApp(config);
+        db = firebase.database();
+        
+        document.getElementById('deviceId').textContent = DEVICE_ID;
+        setupSyncListeners();
+        return true;
+        
+    } catch(e) {
+        console.error('Firebase init error:', e);
+        updateSyncStatus('offline', 'Config error: ' + e.message);
+        return false;
+    }
 }
 
-function saveLocalData(data) {
-    data.version = (data.version || 0) + 1;
-    data.lastModified = Date.now();
-    data.lastModifiedBy = DEVICE_ID;
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
-    localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
-    return data;
-}
-
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-}
-
-// ==================== SYNC ENGINE ====================
+// ==================== SYNC STATUS ====================
 function updateSyncStatus(status, text) {
     const indicator = document.getElementById('syncIndicator');
     const statusText = document.getElementById('syncText');
@@ -484,69 +488,42 @@ function showToast(msg, isError) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// Push local data to Firebase
-async function pushToCloud() {
-    if (!db || !isOnline || syncInProgress) return;
-    syncInProgress = true;
-    updateSyncStatus('syncing', 'Syncing to cloud...');
-    
-    try {
-        const data = getLocalData();
-        await db.ref('machines').set({
-            data: data,
-            timestamp: firebase.database.ServerValue.TIMESTAMP,
-            device: DEVICE_ID
-        });
-        localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
-        updateSyncStatus('online', 'Synced to cloud');
-        showToast('Synced to cloud!');
-    } catch(e) {
-        updateSyncStatus('offline', 'Sync failed - offline');
-        showToast('Sync failed', true);
+// ==================== LOCAL DATA ====================
+function getLocalData() {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (raw) {
+        try { return JSON.parse(raw); } catch(e) {}
     }
-    syncInProgress = false;
+    return { classrooms: [], version: 0, lastModified: 0, lastModifiedBy: '' };
 }
 
-// Pull data from Firebase
-async function pullFromCloud() {
-    if (!db || !isOnline || syncInProgress) return;
-    syncInProgress = true;
-    updateSyncStatus('syncing', 'Fetching from cloud...');
-    
-    try {
-        const snapshot = await db.ref('machines/data').once('value');
-        const cloudData = snapshot.val();
-        
-        if (cloudData && cloudData.classrooms) {
-            const localData = getLocalData();
-            
-            // Simple conflict resolution: higher version wins, or newer timestamp
-            if (!localData.lastModified || (cloudData.lastModified > localData.lastModified && cloudData.lastModifiedBy !== DEVICE_ID)) {
-                localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
-                showToast('Updated from cloud!');
-            }
-        }
-        updateSyncStatus('online', 'Connected');
-    } catch(e) {
-        updateSyncStatus('offline', 'Offline mode');
-    }
-    syncInProgress = false;
-    refreshCurrentView();
+function saveLocalData(data) {
+    data.version = (data.version || 0) + 1;
+    data.lastModified = Date.now();
+    data.lastModifiedBy = DEVICE_ID;
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+    return data;
 }
 
-// Auto-sync when online
-function setupSync() {
-    if (!db) {
-        updateSyncStatus('offline', 'Firebase not configured');
-        return;
-    }
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+// ==================== SYNC ENGINE ====================
+function setupSyncListeners() {
+    if (!db) return;
     
+    // Connection state
     const connectedRef = db.ref('.info/connected');
     connectedRef.on('value', (snap) => {
         isOnline = snap.val() === true;
         if (isOnline) {
-            updateSyncStatus('online', 'Connected');
-            pullFromCloud().then(() => pushToCloud());
+            updateSyncStatus('online', 'Connected - syncing...');
+            // Delay slightly to ensure connection is stable
+            setTimeout(() => {
+                pullFromCloud().then(() => pushToCloud());
+            }, 500);
         } else {
             updateSyncStatus('offline', 'Offline mode');
         }
@@ -561,21 +538,67 @@ function setupSync() {
         const localData = getLocalData();
         if (cloudData.lastModifiedBy !== DEVICE_ID && cloudData.lastModified > (localData.lastModified || 0)) {
             localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
-            showToast('New data from another device!');
+            showToast('Updated from cloud!');
             refreshCurrentView();
         }
     });
     
-    // Periodic sync every 30 seconds when online
+    // Periodic sync
     setInterval(() => {
         if (isOnline && !syncInProgress) pushToCloud();
     }, 30000);
 }
 
-// Manual sync trigger
+async function pushToCloud() {
+    if (!db || !isOnline || syncInProgress) return;
+    syncInProgress = true;
+    updateSyncStatus('syncing', 'Saving to cloud...');
+    
+    try {
+        const data = getLocalData();
+        await db.ref('machines').set({
+            data: data,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            device: DEVICE_ID
+        });
+        localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+        updateSyncStatus('online', 'Synced to cloud');
+    } catch(e) {
+        console.error('Push error:', e);
+        updateSyncStatus('offline', 'Sync failed: ' + e.message);
+    }
+    syncInProgress = false;
+}
+
+async function pullFromCloud() {
+    if (!db || !isOnline || syncInProgress) return;
+    syncInProgress = true;
+    updateSyncStatus('syncing', 'Fetching from cloud...');
+    
+    try {
+        const snapshot = await db.ref('machines/data').once('value');
+        const cloudData = snapshot.val();
+        
+        if (cloudData && cloudData.classrooms) {
+            const localData = getLocalData();
+            
+            if (!localData.lastModified || (cloudData.lastModified > localData.lastModified && cloudData.lastModifiedBy !== DEVICE_ID)) {
+                localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
+                showToast('Downloaded from cloud!');
+                refreshCurrentView();
+            }
+        }
+        updateSyncStatus('online', 'Connected');
+    } catch(e) {
+        console.error('Pull error:', e);
+        updateSyncStatus('offline', 'Fetch failed: ' + e.message);
+    }
+    syncInProgress = false;
+}
+
 function forceSync() {
     if (!db) {
-        showToast('Firebase not configured! Set up in Settings.', true);
+        showToast('Firebase not configured! Enter details in Sync tab.', true);
         return;
     }
     if (!isOnline) {
@@ -586,10 +609,6 @@ function forceSync() {
 }
 
 // ==================== NAVIGATION ====================
-let currentTab = 'lists';
-let currentClassroomId = null;
-let lastSearchQuery = '';
-
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -984,6 +1003,8 @@ function renderSettings() {
     const data = getLocalData();
     const totalMachines = data.classrooms.reduce((sum, c) => sum + c.entries.length, 0);
     const totalChecked = data.classrooms.reduce((sum, c) => sum + c.entries.filter(e => e.isChecked).length, 0);
+    const savedCfg = localStorage.getItem(FIREBASE_CONFIG_KEY);
+    const isConfigured = savedCfg !== null;
     
     let html = `
         <div class="card">
@@ -992,31 +1013,41 @@ function renderSettings() {
         </div>
         
         <div class="card">
-            <div class="card-title">Firebase Setup</div>
-            <div class="card-sub" style="margin-bottom:10px;">You need a free Firebase project for cloud sync.</div>
+            <div class="card-title">Firebase Configuration</div>
+            <div class="card-sub" style="margin-bottom:10px;">
+                ${isConfigured ? '✅ Configured' : '❌ Not configured'}
+            </div>`;
+    
+    if (!isConfigured) {
+        html += `
             <div class="info-box">
-                <b>How to set up:</b><br>
-                1. Go to firebase.google.com<br>
-                2. Create project → Build → Realtime Database<br>
-                3. Start in test mode (allows read/write)<br>
-                4. Copy your config values below
+                <b>How to get your Firebase config:</b><br>
+                1. Go to firebase.google.com → Console<br>
+                2. Click ⚙️ Project Settings<br>
+                3. Scroll to "Your apps" → click &lt;/&gt; (Web)<br>
+                4. Copy the values below
             </div>
             <input type="text" class="input" id="fbApiKey" placeholder="API Key">
             <input type="text" class="input" id="fbProjectId" placeholder="Project ID">
-            <input type="text" class="input" id="fbDatabaseUrl" placeholder="Database URL (https://...firebaseio.com)">
-            <button class="btn btn-secondary" onclick="saveFirebaseConfig()">Save & Connect</button>
-        </div>
-        
-        <div class="card">
-            <div class="card-title">Manual Sync</div>
+            <input type="text" class="input" id="fbDatabaseUrl" placeholder="Database URL">
+            <button class="btn btn-secondary" onclick="saveFirebaseConfig()">Save & Connect</button>`;
+    } else {
+        const cfg = JSON.parse(savedCfg);
+        html += `
+            <div class="info-box">
+                Project: <b>${escapeHtml(cfg.projectId)}</b><br>
+                Database: <b>${escapeHtml(cfg.databaseURL)}</b>
+            </div>
             <button class="btn" onclick="forceSync()">🔄 Force Sync Now</button>
-            <button class="btn btn-gray" onclick="exportAllData()" style="margin-top:8px;">📤 Export JSON Backup</button>
-        </div>
+            <button class="btn btn-danger" onclick="clearFirebaseConfig()" style="margin-top:8px;">Disconnect Firebase</button>`;
+    }
+    
+    html += `</div>
         
         <div class="card">
-            <div class="card-title">Share Read-Only Link</div>
-            <div class="card-sub">Anyone with this link can VIEW your data (read-only)</div>
-            <div class="share-link-box" id="shareLink">Not available - set up Firebase first</div>
+            <div class="card-title">Data Management</div>
+            <button class="btn btn-gray" onclick="exportAllData()">📤 Export JSON Backup</button>
+            <button class="btn btn-danger" onclick="if(confirm('Delete ALL local data? This will also delete cloud data on next sync.')){localStorage.removeItem(LOCAL_KEY);pushToCloud();renderSettings();}" style="margin-top:8px;">🗑️ Delete All Data</button>
         </div>
     `;
     
@@ -1033,18 +1064,40 @@ function saveFirebaseConfig() {
         return;
     }
     
-    const config = { apiKey, projectId, databaseURL };
-    localStorage.setItem('firebase_config', JSON.stringify(config));
-    showToast('Config saved! Reload the page to connect.');
+    const config = {
+        apiKey: apiKey,
+        projectId: projectId,
+        databaseURL: databaseURL,
+        authDomain: projectId + '.firebaseapp.com',
+        storageBucket: projectId + '.appspot.com'
+    };
     
-    // Update the config in memory and init
-    firebaseConfig.apiKey = apiKey;
-    firebaseConfig.authDomain = `${projectId}.firebaseapp.com`;
-    firebaseConfig.databaseURL = databaseURL;
-    firebaseConfig.projectId = projectId;
-    firebaseConfig.storageBucket = `${projectId}.appspot.com`;
+    localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config));
+    showToast('Config saved! Connecting...');
     
-    location.reload();
+    // Try to init immediately
+    setTimeout(() => {
+        if (initFirebase()) {
+            showToast('Connected to Firebase!');
+            renderSettings();
+        } else {
+            showToast('Connection failed. Check your config.', true);
+        }
+    }, 500);
+}
+
+function clearFirebaseConfig() {
+    if (!confirm('Disconnect from Firebase? Local data will be kept.')) return;
+    localStorage.removeItem(FIREBASE_CONFIG_KEY);
+    if (db) {
+        db.goOffline();
+        db = null;
+    }
+    firebase.apps.forEach(app => app.delete());
+    isOnline = false;
+    updateSyncStatus('offline', 'Disconnected');
+    showToast('Firebase disconnected');
+    renderSettings();
 }
 
 function exportAllData() {
@@ -1080,23 +1133,17 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
     });
 });
 
-// Load saved Firebase config
-const savedConfig = localStorage.getItem('firebase_config');
-if (savedConfig) {
-    try {
-        const cfg = JSON.parse(savedConfig);
-        firebaseConfig.apiKey = cfg.apiKey;
-        firebaseConfig.authDomain = `${cfg.projectId}.firebaseapp.com`;
-        firebaseConfig.databaseURL = cfg.databaseURL;
-        firebaseConfig.projectId = cfg.projectId;
-        firebaseConfig.storageBucket = `${cfg.projectId}.appspot.com`;
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.database();
-    } catch(e) {}
+// ==================== INIT ====================
+document.getElementById('deviceId').textContent = DEVICE_ID;
+
+// Try to init Firebase on load
+initFirebase();
+
+// If not configured, show offline status
+if (!db) {
+    updateSyncStatus('offline', 'Tap Sync tab to configure Firebase');
 }
 
-// Init
-setupSync();
 renderLists();
 
 // Register service worker
