@@ -8,7 +8,12 @@
     <meta name="theme-color" content="#0a84ff">
     <title>Machine List Manager</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a84ff'/%3E%3Ctext x='50' y='65' font-size='45' text-anchor='middle' fill='white'%3E⚙%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a84ff'/%3E%3Ctext x='50' y='65' font-size='45' text-anchor='middle' fill='white'%3E%26%23x2699%3B%3C/text%3E%3C/svg%3E">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
@@ -30,7 +35,32 @@
             font-weight: 600;
             flex-shrink: 0;
             z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
+        .sync-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #30d158;
+            box-shadow: 0 0 8px #30d158;
+            animation: pulse 2s infinite;
+        }
+        .sync-indicator.offline {
+            background: #ff9f0a;
+            box-shadow: 0 0 8px #ff9f0a;
+            animation: none;
+        }
+        .sync-indicator.syncing {
+            background: #0a84ff;
+            box-shadow: 0 0 8px #0a84ff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        
         .content {
             flex: 1;
             overflow-y: auto;
@@ -82,6 +112,12 @@
         .btn-secondary { background: #30d158; }
         .btn-danger { background: #ff453a; }
         .btn-gray { background: #3a3a3c; }
+        .btn-small {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 14px;
+            margin-top: 0;
+        }
         
         .card {
             background: #1c1c1e;
@@ -163,7 +199,6 @@
             padding: 60px 20px;
             color: #8e8e93;
         }
-        .empty-state svg { width: 60px; height: 60px; margin-bottom: 15px; opacity: 0.5; }
         
         .result-found {
             background: #1c1c1e;
@@ -219,25 +254,6 @@
             cursor: pointer;
         }
         
-        .segmented {
-            display: flex;
-            background: #2c2c2e;
-            border-radius: 8px;
-            padding: 2px;
-            margin-bottom: 15px;
-        }
-        .segment-btn {
-            flex: 1;
-            background: none;
-            border: none;
-            color: #8e8e93;
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        .segment-btn.active { background: #3a3a3c; color: white; font-weight: 600; }
-        
         .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 5px; }
         .tag-class { background: #bf5af2; color: white; }
         .tag-line { background: #64d2ff; color: black; }
@@ -261,15 +277,63 @@
             line-height: 1.5;
             color: #8e8e93;
         }
+        
+        .sync-status-bar {
+            background: #1c1c1e;
+            border-bottom: 1px solid #2c2c2e;
+            padding: 8px 15px;
+            font-size: 12px;
+            color: #8e8e93;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .share-link-box {
+            background: #2c2c2e;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 10px 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            color: #0a84ff;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: #30d158;
+            color: black;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            z-index: 2000;
+            transition: transform 0.3s ease;
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .toast.error { background: #ff453a; color: white; }
     </style>
 </head>
 <body>
 
-<div class="header" id="pageTitle">Lists</div>
-
-<div class="content" id="mainContent">
-    <!-- Content injected by JS -->
+<div class="header">
+    <div class="sync-indicator" id="syncIndicator"></div>
+    <span id="pageTitle">Lists</span>
 </div>
+
+<div class="sync-status-bar" id="syncStatus">
+    <span id="syncText">Checking connection...</span>
+    <span id="deviceId" style="font-size:10px;opacity:0.5;"></span>
+</div>
+
+<div class="content" id="mainContent"></div>
 
 <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('lists')">
@@ -284,9 +348,15 @@
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         New Reg.
     </button>
+    <button class="tab-btn" onclick="switchTab('settings')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Sync
+    </button>
 </div>
 
-<!-- Add Classroom Modal -->
+<div class="toast" id="toast"></div>
+
+<!-- Modals (same as before) -->
 <div class="modal-overlay" id="addClassModal">
     <div class="modal-sheet">
         <div class="modal-header">
@@ -298,24 +368,22 @@
     </div>
 </div>
 
-<!-- Add Entry Modal -->
 <div class="modal-overlay" id="addEntryModal">
     <div class="modal-sheet">
         <div class="modal-header">
             <div class="modal-title">Add Machine</div>
             <button class="modal-close" onclick="closeModal('addEntryModal')">×</button>
         </div>
-        <input type="number" class="input" id="entryLine" placeholder="Line Number (e.g. 1)">
-        <input type="text" class="input" id="entryCode" placeholder="Article Code (e.g. 5110013)">
-        <input type="text" class="input" id="entryLI" placeholder="LI / Serial (e.g. 2767 or 1564-1570)">
+        <input type="number" class="input" id="entryLine" placeholder="Line Number">
+        <input type="text" class="input" id="entryCode" placeholder="Article Code">
+        <input type="text" class="input" id="entryLI" placeholder="LI / Serial">
         <label style="display:flex;align-items:center;gap:8px;margin-bottom:15px;color:#8e8e93;font-size:14px;">
-            <input type="checkbox" id="entryNI" style="width:20px;height:20px;"> Mark as "NI" (Non Identified)
+            <input type="checkbox" id="entryNI" style="width:20px;height:20px;"> Mark as "NI"
         </label>
         <button class="btn" onclick="addEntry()">Add Machine</button>
     </div>
 </div>
 
-<!-- Import Modal -->
 <div class="modal-overlay" id="importModal">
     <div class="modal-sheet">
         <div class="modal-header">
@@ -323,29 +391,22 @@
             <button class="modal-close" onclick="closeModal('importModal')">×</button>
         </div>
         <div class="info-box">
-            Paste data in format:<br>
-            <b>LineNumber,ArticleCode,LI</b><br>
-            Example:<br>
-            1,5110013,2767<br>
-            2,5110286,3167<br>
-            4,5110101,1564-1570
+            Format: <b>LineNumber,ArticleCode,LI</b><br>
+            1,5110013,2767<br>2,5110286,3167<br>4,5110101,1564-1570
         </div>
-        <textarea class="textarea" id="importData" placeholder="1,5110013,2767&#10;2,5110286,3167&#10;3,5110286,3169"></textarea>
+        <textarea class="textarea" id="importData" placeholder="Paste CSV here..."></textarea>
         <button class="btn btn-secondary" onclick="importCSV()">Import Data</button>
     </div>
 </div>
 
-<!-- Register New Machine Modal -->
 <div class="modal-overlay" id="registerModal">
     <div class="modal-sheet">
         <div class="modal-header">
             <div class="modal-title">Register New Machine</div>
             <button class="modal-close" onclick="closeModal('registerModal')">×</button>
         </div>
-        <div class="info-box">Serial <b id="regSerialDisplay"></b> not found in any list. Register it below:</div>
-        <select class="input" id="regClassroom">
-            <option value="">Select Classroom...</option>
-        </select>
+        <div class="info-box">Serial <b id="regSerialDisplay"></b> not found. Register it:</div>
+        <select class="input" id="regClassroom"><option value="">Select Classroom...</option></select>
         <input type="number" class="input" id="regLine" placeholder="Line Number">
         <input type="text" class="input" id="regCode" placeholder="Article Code">
         <input type="hidden" id="regLI">
@@ -354,35 +415,193 @@
 </div>
 
 <script>
-// ==================== DATA STORE ====================
-const STORAGE_KEY = 'machineListManager_v1';
+// ==================== FIREBASE CONFIG ====================
+// REPLACE THESE WITH YOUR OWN FIREBASE PROJECT VALUES
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase
+let db = null;
+let isOnline = false;
+let syncInProgress = false;
+const DEVICE_ID = 'device_' + Math.random().toString(36).substr(2, 9);
+document.getElementById('deviceId').textContent = DEVICE_ID;
+
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+} catch(e) {
+    console.log('Firebase not configured yet');
+}
+
+// ==================== LOCAL STORAGE ====================
+const LOCAL_KEY = 'machine_manager_data';
+const LAST_SYNC_KEY = 'machine_manager_last_sync';
+
+function getLocalData() {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (raw) return JSON.parse(raw);
+    return { classrooms: [], version: 0 };
+}
+
+function saveLocalData(data) {
+    data.version = (data.version || 0) + 1;
+    data.lastModified = Date.now();
+    data.lastModifiedBy = DEVICE_ID;
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+    return data;
+}
+
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+// ==================== SYNC ENGINE ====================
+function updateSyncStatus(status, text) {
+    const indicator = document.getElementById('syncIndicator');
+    const statusText = document.getElementById('syncText');
+    
+    indicator.className = 'sync-indicator';
+    if (status === 'offline') indicator.classList.add('offline');
+    else if (status === 'syncing') indicator.classList.add('syncing');
+    
+    statusText.textContent = text;
+}
+
+function showToast(msg, isError) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast' + (isError ? ' error' : '');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// Push local data to Firebase
+async function pushToCloud() {
+    if (!db || !isOnline || syncInProgress) return;
+    syncInProgress = true;
+    updateSyncStatus('syncing', 'Syncing to cloud...');
+    
+    try {
+        const data = getLocalData();
+        await db.ref('machines').set({
+            data: data,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            device: DEVICE_ID
+        });
+        localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+        updateSyncStatus('online', 'Synced to cloud');
+        showToast('Synced to cloud!');
+    } catch(e) {
+        updateSyncStatus('offline', 'Sync failed - offline');
+        showToast('Sync failed', true);
+    }
+    syncInProgress = false;
+}
+
+// Pull data from Firebase
+async function pullFromCloud() {
+    if (!db || !isOnline || syncInProgress) return;
+    syncInProgress = true;
+    updateSyncStatus('syncing', 'Fetching from cloud...');
+    
+    try {
+        const snapshot = await db.ref('machines/data').once('value');
+        const cloudData = snapshot.val();
+        
+        if (cloudData && cloudData.classrooms) {
+            const localData = getLocalData();
+            
+            // Simple conflict resolution: higher version wins, or newer timestamp
+            if (!localData.lastModified || (cloudData.lastModified > localData.lastModified && cloudData.lastModifiedBy !== DEVICE_ID)) {
+                localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
+                showToast('Updated from cloud!');
+            }
+        }
+        updateSyncStatus('online', 'Connected');
+    } catch(e) {
+        updateSyncStatus('offline', 'Offline mode');
+    }
+    syncInProgress = false;
+    refreshCurrentView();
+}
+
+// Auto-sync when online
+function setupSync() {
+    if (!db) {
+        updateSyncStatus('offline', 'Firebase not configured');
+        return;
+    }
+    
+    const connectedRef = db.ref('.info/connected');
+    connectedRef.on('value', (snap) => {
+        isOnline = snap.val() === true;
+        if (isOnline) {
+            updateSyncStatus('online', 'Connected');
+            pullFromCloud().then(() => pushToCloud());
+        } else {
+            updateSyncStatus('offline', 'Offline mode');
+        }
+    });
+    
+    // Listen for remote changes
+    db.ref('machines').on('value', (snapshot) => {
+        if (!snapshot.exists()) return;
+        const cloudData = snapshot.val().data;
+        if (!cloudData) return;
+        
+        const localData = getLocalData();
+        if (cloudData.lastModifiedBy !== DEVICE_ID && cloudData.lastModified > (localData.lastModified || 0)) {
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
+            showToast('New data from another device!');
+            refreshCurrentView();
+        }
+    });
+    
+    // Periodic sync every 30 seconds when online
+    setInterval(() => {
+        if (isOnline && !syncInProgress) pushToCloud();
+    }, 30000);
+}
+
+// Manual sync trigger
+function forceSync() {
+    if (!db) {
+        showToast('Firebase not configured! Set up in Settings.', true);
+        return;
+    }
+    if (!isOnline) {
+        showToast('You are offline', true);
+        return;
+    }
+    pullFromCloud().then(() => pushToCloud());
+}
+
+// ==================== NAVIGATION ====================
 let currentTab = 'lists';
 let currentClassroomId = null;
 let lastSearchQuery = '';
 
-function getData() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-    return { classrooms: [] };
-}
-
-function saveData(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-// ==================== NAVIGATION ====================
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     event.currentTarget.classList.add('active');
-    
-    if (tab === 'lists') renderLists();
-    else if (tab === 'search') renderSearch();
-    else if (tab === 'newreg') renderNewReg();
+    refreshCurrentView();
+}
+
+function refreshCurrentView() {
+    if (currentTab === 'lists') renderLists();
+    else if (currentTab === 'search') renderSearch();
+    else if (currentTab === 'newreg') renderNewReg();
+    else if (currentTab === 'settings') renderSettings();
 }
 
 function setTitle(title) {
@@ -392,12 +611,11 @@ function setTitle(title) {
 // ==================== LISTS TAB ====================
 function renderLists() {
     setTitle('Classrooms');
-    const data = getData();
+    const data = getLocalData();
     let html = '';
     
     if (data.classrooms.length === 0) {
         html = `<div class="empty-state">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
             <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No Classrooms Yet</div>
             <div>Create your first classroom to get started</div>
         </div>`;
@@ -413,10 +631,8 @@ function renderLists() {
     }
     
     html += `<button class="btn" onclick="openModal('addClassModal')">+ Add Classroom</button>`;
-    
-    if (data.classrooms.length > 0) {
-        html += `<button class="btn btn-danger" onclick="if(confirm('Delete ALL data?')){localStorage.removeItem(STORAGE_KEY);renderLists();}" style="margin-top:8px;background:#3a3a3c;">Reset All Data</button>`;
-    }
+    html += `<button class="btn btn-gray" onclick="exportAllData()" style="margin-top:8px;">📤 Export Backup</button>`;
+    html += `<button class="btn btn-danger" onclick="if(confirm('Delete ALL data?')){localStorage.removeItem(LOCAL_KEY);localStorage.removeItem(LAST_SYNC_KEY);pushToCloud();renderLists();}" style="margin-top:8px;background:#3a3a3c;">Reset All Data</button>`;
     
     document.getElementById('mainContent').innerHTML = html;
 }
@@ -425,14 +641,15 @@ function addClassroom() {
     const name = document.getElementById('newClassName').value.trim();
     if (!name) return alert('Enter a name');
     
-    const data = getData();
+    const data = getLocalData();
     data.classrooms.push({
         id: generateId(),
         name: name,
         createdAt: Date.now(),
         entries: []
     });
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     closeModal('addClassModal');
     document.getElementById('newClassName').value = '';
     renderLists();
@@ -444,7 +661,7 @@ function openClassroom(id) {
 }
 
 function renderClassroomDetail() {
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === currentClassroomId);
     if (!classroom) return renderLists();
     
@@ -456,9 +673,8 @@ function renderClassroomDetail() {
     </div>`;
     
     if (classroom.entries.length === 0) {
-        html += `<div class="empty-state">No machines in this classroom yet.</div>`;
+        html += `<div class="empty-state">No machines yet.</div>`;
     } else {
-        // Sort by line number
         const sorted = [...classroom.entries].sort((a,b) => a.lineNumber - b.lineNumber);
         sorted.forEach(entry => {
             const rangeBadge = entry.isRange ? `<span class="entry-badge badge-ni">RANGE</span>` : '';
@@ -490,7 +706,7 @@ function addEntry() {
     
     if (!line || !code || !li) return alert('Fill all fields');
     
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === currentClassroomId);
     
     const isRange = li.includes('-');
@@ -514,7 +730,8 @@ function addEntry() {
         registeredAt: null
     });
     
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     closeModal('addEntryModal');
     document.getElementById('entryLine').value = '';
     document.getElementById('entryCode').value = '';
@@ -528,7 +745,7 @@ function importCSV() {
     if (!raw) return;
     
     const lines = raw.split('\n');
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === currentClassroomId);
     let added = 0;
     
@@ -567,7 +784,8 @@ function importCSV() {
         added++;
     });
     
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     closeModal('importModal');
     document.getElementById('importData').value = '';
     alert(`Imported ${added} machines`);
@@ -575,20 +793,22 @@ function importCSV() {
 }
 
 function toggleCheck(classId, entryId) {
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === classId);
     const entry = classroom.entries.find(e => e.id === entryId);
     entry.isChecked = !entry.isChecked;
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     renderClassroomDetail();
 }
 
 function deleteEntry(classId, entryId) {
     if (!confirm('Delete this entry?')) return;
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === classId);
     classroom.entries = classroom.entries.filter(e => e.id !== entryId);
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     renderClassroomDetail();
 }
 
@@ -610,12 +830,12 @@ function performSearch() {
     lastSearchQuery = document.getElementById('searchInput').value;
     if (!query) return;
     
-    const data = getData();
+    const data = getLocalData();
     const results = [];
     
     data.classrooms.forEach(c => {
         c.entries.forEach(e => {
-            if (e.isNI) return; // Skip NI entries in serial search
+            if (e.isNI) return;
             
             let match = false;
             if (e.isRange && e.rangeStart !== null && e.rangeEnd !== null) {
@@ -625,9 +845,7 @@ function performSearch() {
                 if (entryVal === query) match = true;
             }
             
-            if (match) {
-                results.push({ classroom: c, entry: e });
-            }
+            if (match) results.push({ classroom: c, entry: e });
         });
     });
     
@@ -656,7 +874,7 @@ function performSearch() {
     } else {
         html += `<div class="result-notfound">
             <div style="font-size:18px;font-weight:600;margin-bottom:8px;">Not Found</div>
-            <div style="color:#8e8e93;margin-bottom:15px;">Serial number <b>${query}</b> does not exist in any classroom.</div>
+            <div style="color:#8e8e93;margin-bottom:15px;">Serial number <b>${query}</b> does not exist.</div>
             <button class="btn btn-secondary" onclick="openRegisterModal(${query})">+ Register as New Machine</button>
         </div>`;
     }
@@ -665,16 +883,17 @@ function performSearch() {
 }
 
 function toggleCheckFromSearch(classId, entryId) {
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === classId);
     const entry = classroom.entries.find(e => e.id === entryId);
     entry.isChecked = !entry.isChecked;
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     performSearch();
 }
 
 function openRegisterModal(serial) {
-    const data = getData();
+    const data = getLocalData();
     const select = document.getElementById('regClassroom');
     select.innerHTML = '<option value="">Select Classroom...</option>';
     data.classrooms.forEach(c => {
@@ -693,7 +912,7 @@ function registerNewMachine() {
     
     if (!classId || !line || !code) return alert('Fill all fields');
     
-    const data = getData();
+    const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === classId);
     
     classroom.entries.push({
@@ -710,12 +929,12 @@ function registerNewMachine() {
         registeredAt: Date.now()
     });
     
-    saveData(data);
+    saveLocalData(data);
+    pushToCloud();
     closeModal('registerModal');
     document.getElementById('regLine').value = '';
     document.getElementById('regCode').value = '';
     
-    // Switch to search and show confirmation
     lastSearchQuery = li;
     renderSearch();
     setTimeout(performSearch, 100);
@@ -724,7 +943,7 @@ function registerNewMachine() {
 // ==================== NEW REGISTRATIONS TAB ====================
 function renderNewReg() {
     setTitle('New Registrations');
-    const data = getData();
+    const data = getLocalData();
     const newEntries = [];
     
     data.classrooms.forEach(c => {
@@ -733,17 +952,16 @@ function renderNewReg() {
         });
     });
     
-    // Sort by registration date, newest first
     newEntries.sort((a,b) => (b.entry.registeredAt || 0) - (a.entry.registeredAt || 0));
     
     let html = '';
     if (newEntries.length === 0) {
         html = `<div class="empty-state">
             <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No New Registrations</div>
-            <div>Machines you register from the Search tab will appear here</div>
+            <div>Machines registered from Search will appear here</div>
         </div>`;
     } else {
-        html += `<div style="margin-bottom:15px;color:#8e8e93;font-size:14px;">${newEntries.length} newly registered machine(s)</div>`;
+        html += `<div style="margin-bottom:15px;color:#8e8e93;font-size:14px;">${newEntries.length} newly registered</div>`;
         newEntries.forEach(r => {
             const date = r.entry.registeredAt ? new Date(r.entry.registeredAt).toLocaleDateString() : 'Unknown';
             html += `<div class="entry-row">
@@ -757,6 +975,88 @@ function renderNewReg() {
     }
     
     document.getElementById('mainContent').innerHTML = html;
+}
+
+// ==================== SETTINGS / SYNC TAB ====================
+function renderSettings() {
+    setTitle('Sync & Settings');
+    
+    const data = getLocalData();
+    const totalMachines = data.classrooms.reduce((sum, c) => sum + c.entries.length, 0);
+    const totalChecked = data.classrooms.reduce((sum, c) => sum + c.entries.filter(e => e.isChecked).length, 0);
+    
+    let html = `
+        <div class="card">
+            <div class="card-title">Statistics</div>
+            <div class="card-sub">${data.classrooms.length} classrooms • ${totalMachines} machines • ${totalChecked} checked</div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">Firebase Setup</div>
+            <div class="card-sub" style="margin-bottom:10px;">You need a free Firebase project for cloud sync.</div>
+            <div class="info-box">
+                <b>How to set up:</b><br>
+                1. Go to firebase.google.com<br>
+                2. Create project → Build → Realtime Database<br>
+                3. Start in test mode (allows read/write)<br>
+                4. Copy your config values below
+            </div>
+            <input type="text" class="input" id="fbApiKey" placeholder="API Key">
+            <input type="text" class="input" id="fbProjectId" placeholder="Project ID">
+            <input type="text" class="input" id="fbDatabaseUrl" placeholder="Database URL (https://...firebaseio.com)">
+            <button class="btn btn-secondary" onclick="saveFirebaseConfig()">Save & Connect</button>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">Manual Sync</div>
+            <button class="btn" onclick="forceSync()">🔄 Force Sync Now</button>
+            <button class="btn btn-gray" onclick="exportAllData()" style="margin-top:8px;">📤 Export JSON Backup</button>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">Share Read-Only Link</div>
+            <div class="card-sub">Anyone with this link can VIEW your data (read-only)</div>
+            <div class="share-link-box" id="shareLink">Not available - set up Firebase first</div>
+        </div>
+    `;
+    
+    document.getElementById('mainContent').innerHTML = html;
+}
+
+function saveFirebaseConfig() {
+    const apiKey = document.getElementById('fbApiKey').value.trim();
+    const projectId = document.getElementById('fbProjectId').value.trim();
+    const databaseURL = document.getElementById('fbDatabaseUrl').value.trim();
+    
+    if (!apiKey || !projectId || !databaseURL) {
+        showToast('Fill all Firebase fields', true);
+        return;
+    }
+    
+    const config = { apiKey, projectId, databaseURL };
+    localStorage.setItem('firebase_config', JSON.stringify(config));
+    showToast('Config saved! Reload the page to connect.');
+    
+    // Update the config in memory and init
+    firebaseConfig.apiKey = apiKey;
+    firebaseConfig.authDomain = `${projectId}.firebaseapp.com`;
+    firebaseConfig.databaseURL = databaseURL;
+    firebaseConfig.projectId = projectId;
+    firebaseConfig.storageBucket = `${projectId}.appspot.com`;
+    
+    location.reload();
+}
+
+function exportAllData() {
+    const data = getLocalData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `machine_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup downloaded!');
 }
 
 // ==================== UTILS ====================
@@ -774,17 +1074,32 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Close modals on outside click
 document.querySelectorAll('.modal-overlay').forEach(m => {
     m.addEventListener('click', (e) => {
         if (e.target === m) m.classList.remove('active');
     });
 });
 
+// Load saved Firebase config
+const savedConfig = localStorage.getItem('firebase_config');
+if (savedConfig) {
+    try {
+        const cfg = JSON.parse(savedConfig);
+        firebaseConfig.apiKey = cfg.apiKey;
+        firebaseConfig.authDomain = `${cfg.projectId}.firebaseapp.com`;
+        firebaseConfig.databaseURL = cfg.databaseURL;
+        firebaseConfig.projectId = cfg.projectId;
+        firebaseConfig.storageBucket = `${cfg.projectId}.appspot.com`;
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+    } catch(e) {}
+}
+
 // Init
+setupSync();
 renderLists();
 
-// Register service worker for offline
+// Register service worker
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
 }
