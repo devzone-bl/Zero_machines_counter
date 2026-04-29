@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a84ff">
+    <title>Machine List Manager</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a84ff'/%3E%3Ctext x='50' y='65' font-size='45' text-anchor='middle' fill='white'%3E⚙%3C/text%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #1c1c1e;
+            padding: 15px 20px;
+            padding-top: env(safe-area-inset-top, 15px);
+            border-bottom: 1px solid #2c2c2e;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            padding-bottom: 100px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1c1c1e;
+            border-top: 1px solid #2c2c2e;
+            display: flex;
+            justify-content: space-around;
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+            padding-top: 8px;
+            z-index: 100;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: #8e8e93;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            flex: 1;
+            cursor: pointer;
+            padding: 5px;
+        }
+        .tab-btn.active { color: #0a84ff; }
+        .tab-btn svg { width: 24px; height: 24px; }
+        
+        .btn {
+            background: #0a84ff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-secondary { background: #30d158; }
+        .btn-danger { background: #ff453a; }
+        .btn-gray { background: #3a3a3c; }
+        
+        .card {
+            background: #1c1c1e;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            border: 1px solid #2c2c2e;
+        }
+        .card-title { font-size: 17px; font-weight: 600; margin-bottom: 5px; }
+        .card-sub { font-size: 13px; color: #8e8e93; }
+        
+        .input, .textarea, select {
+            width: 100%;
+            background: #2c2c2e;
+            border: 1px solid #3a3a3c;
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+        .textarea { min-height: 150px; font-family: monospace; font-size: 13px; }
+        
+        .entry-row {
+            background: #1c1c1e;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid #2c2c2e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .entry-info { flex: 1; }
+        .entry-line { font-size: 12px; color: #8e8e93; margin-bottom: 2px; }
+        .entry-code { font-size: 15px; font-weight: 500; }
+        .entry-li { font-size: 14px; color: #0a84ff; margin-top: 2px; }
+        .entry-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+        .badge-new { background: #0a84ff; color: white; }
+        .badge-ni { background: #ff9f0a; color: black; }
+        .badge-checked { background: #30d158; color: black; }
+        
+        .check-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #30d158;
+            background: transparent;
+            color: #30d158;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        .check-btn.checked { background: #30d158; color: black; }
+        
+        .search-box {
+            position: sticky;
+            top: 0;
+            background: #000;
+            padding: 10px 0;
+            z-index: 5;
+            margin-bottom: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8e8e93;
+        }
+        .empty-state svg { width: 60px; height: 60px; margin-bottom: 15px; opacity: 0.5; }
+        
+        .result-found {
+            background: #1c1c1e;
+            border-left: 4px solid #30d158;
+            padding: 15px;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 10px;
+        }
+        .result-notfound {
+            background: #1c1c1e;
+            border-left: 4px solid #ff453a;
+            padding: 15px;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 10px;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-sheet {
+            background: #1c1c1e;
+            width: 100%;
+            max-height: 90vh;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title { font-size: 20px; font-weight: 700; }
+        .modal-close {
+            background: #3a3a3c;
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        
+        .segmented {
+            display: flex;
+            background: #2c2c2e;
+            border-radius: 8px;
+            padding: 2px;
+            margin-bottom: 15px;
+        }
+        .segment-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: #8e8e93;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .segment-btn.active { background: #3a3a3c; color: white; font-weight: 600; }
+        
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 5px; }
+        .tag-class { background: #bf5af2; color: white; }
+        .tag-line { background: #64d2ff; color: black; }
+        
+        .delete-btn {
+            background: #ff453a;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .info-box {
+            background: #2c2c2e;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #8e8e93;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header" id="pageTitle">Lists</div>
+
+<div class="content" id="mainContent">
+    <!-- Content injected by JS -->
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('lists')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Lists
+    </button>
+    <button class="tab-btn" onclick="switchTab('search')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        Search
+    </button>
+    <button class="tab-btn" onclick="switchTab('newreg')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        New Reg.
+    </button>
+</div>
+
+<!-- Add Classroom Modal -->
+<div class="modal-overlay" id="addClassModal">
+    <div class="modal-sheet">
+        <div class="modal-header">
+            <div class="modal-title">New Classroom</div>
+            <button class="modal-close" onclick="closeModal('addClassModal')">×</button>
+        </div>
+        <input type="text" class="input" id="newClassName" placeholder="Classroom name (e.g. Salle 1)">
+        <button class="btn" onclick="addClassroom()">Create Classroom</button>
+    </div>
+</div>
+
+<!-- Add Entry Modal -->
+<div class="modal-overlay" id="addEntryModal">
+    <div class="modal-sheet">
+        <div class="modal-header">
+            <div class="modal-title">Add Machine</div>
+            <button class="modal-close" onclick="closeModal('addEntryModal')">×</button>
+        </div>
+        <input type="number" class="input" id="entryLine" placeholder="Line Number (e.g. 1)">
+        <input type="text" class="input" id="entryCode" placeholder="Article Code (e.g. 5110013)">
+        <input type="text" class="input" id="entryLI" placeholder="LI / Serial (e.g. 2767 or 1564-1570)">
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:15px;color:#8e8e93;font-size:14px;">
+            <input type="checkbox" id="entryNI" style="width:20px;height:20px;"> Mark as "NI" (Non Identified)
+        </label>
+        <button class="btn" onclick="addEntry()">Add Machine</button>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal">
+    <div class="modal-sheet">
+        <div class="modal-header">
+            <div class="modal-title">Import CSV</div>
+            <button class="modal-close" onclick="closeModal('importModal')">×</button>
+        </div>
+        <div class="info-box">
+            Paste data in format:<br>
+            <b>LineNumber,ArticleCode,LI</b><br>
+            Example:<br>
+            1,5110013,2767<br>
+            2,5110286,3167<br>
+            4,5110101,1564-1570
+        </div>
+        <textarea class="textarea" id="importData" placeholder="1,5110013,2767&#10;2,5110286,3167&#10;3,5110286,3169"></textarea>
+        <button class="btn btn-secondary" onclick="importCSV()">Import Data</button>
+    </div>
+</div>
+
+<!-- Register New Machine Modal -->
+<div class="modal-overlay" id="registerModal">
+    <div class="modal-sheet">
+        <div class="modal-header">
+            <div class="modal-title">Register New Machine</div>
+            <button class="modal-close" onclick="closeModal('registerModal')">×</button>
+        </div>
+        <div class="info-box">Serial <b id="regSerialDisplay"></b> not found in any list. Register it below:</div>
+        <select class="input" id="regClassroom">
+            <option value="">Select Classroom...</option>
+        </select>
+        <input type="number" class="input" id="regLine" placeholder="Line Number">
+        <input type="text" class="input" id="regCode" placeholder="Article Code">
+        <input type="hidden" id="regLI">
+        <button class="btn btn-secondary" onclick="registerNewMachine()">Register as New</button>
+    </div>
+</div>
+
+<script>
+// ==================== DATA STORE ====================
+const STORAGE_KEY = 'machineListManager_v1';
+let currentTab = 'lists';
+let currentClassroomId = null;
+let lastSearchQuery = '';
+
+function getData() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+    return { classrooms: [] };
+}
+
+function saveData(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// ==================== NAVIGATION ====================
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    
+    if (tab === 'lists') renderLists();
+    else if (tab === 'search') renderSearch();
+    else if (tab === 'newreg') renderNewReg();
+}
+
+function setTitle(title) {
+    document.getElementById('pageTitle').textContent = title;
+}
+
+// ==================== LISTS TAB ====================
+function renderLists() {
+    setTitle('Classrooms');
+    const data = getData();
+    let html = '';
+    
+    if (data.classrooms.length === 0) {
+        html = `<div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No Classrooms Yet</div>
+            <div>Create your first classroom to get started</div>
+        </div>`;
+    } else {
+        data.classrooms.forEach(c => {
+            const checked = c.entries.filter(e => e.isChecked).length;
+            const total = c.entries.length;
+            html += `<div class="card" onclick="openClassroom('${c.id}')" style="cursor:pointer;">
+                <div class="card-title">${escapeHtml(c.name)}</div>
+                <div class="card-sub">${total} machines • ${checked} checked</div>
+            </div>`;
+        });
+    }
+    
+    html += `<button class="btn" onclick="openModal('addClassModal')">+ Add Classroom</button>`;
+    
+    if (data.classrooms.length > 0) {
+        html += `<button class="btn btn-danger" onclick="if(confirm('Delete ALL data?')){localStorage.removeItem(STORAGE_KEY);renderLists();}" style="margin-top:8px;background:#3a3a3c;">Reset All Data</button>`;
+    }
+    
+    document.getElementById('mainContent').innerHTML = html;
+}
+
+function addClassroom() {
+    const name = document.getElementById('newClassName').value.trim();
+    if (!name) return alert('Enter a name');
+    
+    const data = getData();
+    data.classrooms.push({
+        id: generateId(),
+        name: name,
+        createdAt: Date.now(),
+        entries: []
+    });
+    saveData(data);
+    closeModal('addClassModal');
+    document.getElementById('newClassName').value = '';
+    renderLists();
+}
+
+function openClassroom(id) {
+    currentClassroomId = id;
+    renderClassroomDetail();
+}
+
+function renderClassroomDetail() {
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === currentClassroomId);
+    if (!classroom) return renderLists();
+    
+    setTitle(classroom.name);
+    
+    let html = `<div style="display:flex;gap:8px;margin-bottom:15px;">
+        <button class="btn" style="flex:1;margin-top:0;" onclick="openModal('addEntryModal')">+ Add One</button>
+        <button class="btn btn-secondary" style="flex:1;margin-top:0;" onclick="openModal('importModal')">Import CSV</button>
+    </div>`;
+    
+    if (classroom.entries.length === 0) {
+        html += `<div class="empty-state">No machines in this classroom yet.</div>`;
+    } else {
+        // Sort by line number
+        const sorted = [...classroom.entries].sort((a,b) => a.lineNumber - b.lineNumber);
+        sorted.forEach(entry => {
+            const rangeBadge = entry.isRange ? `<span class="entry-badge badge-ni">RANGE</span>` : '';
+            const niBadge = entry.isNI ? `<span class="entry-badge badge-ni">NI</span>` : '';
+            const newBadge = entry.isNewlyRegistered ? `<span class="entry-badge badge-new">NEW</span>` : '';
+            const checkedClass = entry.isChecked ? 'checked' : '';
+            
+            html += `<div class="entry-row">
+                <div class="entry-info">
+                    <div class="entry-line">Line ${entry.lineNumber}</div>
+                    <div class="entry-code">${escapeHtml(entry.articleCode)} ${niBadge}${rangeBadge}${newBadge}</div>
+                    <div class="entry-li">${escapeHtml(entry.li)}</div>
+                </div>
+                <button class="check-btn ${checkedClass}" onclick="event.stopPropagation();toggleCheck('${classroom.id}','${entry.id}')">✓</button>
+                <button class="delete-btn" onclick="event.stopPropagation();deleteEntry('${classroom.id}','${entry.id}')" style="margin-left:8px;">Del</button>
+            </div>`;
+        });
+    }
+    
+    html += `<button class="btn btn-gray" onclick="renderLists()" style="margin-top:20px;">← Back to Lists</button>`;
+    document.getElementById('mainContent').innerHTML = html;
+}
+
+function addEntry() {
+    const line = parseInt(document.getElementById('entryLine').value);
+    const code = document.getElementById('entryCode').value.trim();
+    const li = document.getElementById('entryLI').value.trim();
+    const isNI = document.getElementById('entryNI').checked;
+    
+    if (!line || !code || !li) return alert('Fill all fields');
+    
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === currentClassroomId);
+    
+    const isRange = li.includes('-');
+    let rangeStart = null, rangeEnd = null;
+    if (isRange) {
+        const parts = li.split('-').map(x => parseInt(x.trim()));
+        if (parts.length === 2) { rangeStart = parts[0]; rangeEnd = parts[1]; }
+    }
+    
+    classroom.entries.push({
+        id: generateId(),
+        lineNumber: line,
+        articleCode: code,
+        li: li,
+        isRange: isRange,
+        rangeStart: rangeStart,
+        rangeEnd: rangeEnd,
+        isNI: isNI,
+        isChecked: false,
+        isNewlyRegistered: false,
+        registeredAt: null
+    });
+    
+    saveData(data);
+    closeModal('addEntryModal');
+    document.getElementById('entryLine').value = '';
+    document.getElementById('entryCode').value = '';
+    document.getElementById('entryLI').value = '';
+    document.getElementById('entryNI').checked = false;
+    renderClassroomDetail();
+}
+
+function importCSV() {
+    const raw = document.getElementById('importData').value.trim();
+    if (!raw) return;
+    
+    const lines = raw.split('\n');
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === currentClassroomId);
+    let added = 0;
+    
+    lines.forEach(line => {
+        const parts = line.split(',').map(x => x.trim());
+        if (parts.length < 3) return;
+        
+        const lineNum = parseInt(parts[0]);
+        const code = parts[1];
+        const li = parts[2];
+        
+        if (!lineNum || !code || !li) return;
+        
+        const isRange = li.includes('-');
+        let rangeStart = null, rangeEnd = null;
+        if (isRange) {
+            const r = li.split('-').map(x => parseInt(x.trim()));
+            if (r.length === 2) { rangeStart = r[0]; rangeEnd = r[1]; }
+        }
+        
+        const isNI = (code.toUpperCase() === 'NI' || li.toUpperCase() === 'NI');
+        
+        classroom.entries.push({
+            id: generateId(),
+            lineNumber: lineNum,
+            articleCode: isNI ? 'NI' : code,
+            li: li,
+            isRange: isRange,
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+            isNI: isNI,
+            isChecked: false,
+            isNewlyRegistered: false,
+            registeredAt: null
+        });
+        added++;
+    });
+    
+    saveData(data);
+    closeModal('importModal');
+    document.getElementById('importData').value = '';
+    alert(`Imported ${added} machines`);
+    renderClassroomDetail();
+}
+
+function toggleCheck(classId, entryId) {
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === classId);
+    const entry = classroom.entries.find(e => e.id === entryId);
+    entry.isChecked = !entry.isChecked;
+    saveData(data);
+    renderClassroomDetail();
+}
+
+function deleteEntry(classId, entryId) {
+    if (!confirm('Delete this entry?')) return;
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === classId);
+    classroom.entries = classroom.entries.filter(e => e.id !== entryId);
+    saveData(data);
+    renderClassroomDetail();
+}
+
+// ==================== SEARCH TAB ====================
+function renderSearch() {
+    setTitle('Search Machine');
+    let html = `<div class="search-box">
+        <input type="number" class="input" id="searchInput" placeholder="Enter serial number..." 
+            value="${lastSearchQuery}" onkeyup="if(event.key==='Enter')performSearch()">
+        <button class="btn" onclick="performSearch()">Search</button>
+    </div>
+    <div id="searchResults"></div>`;
+    document.getElementById('mainContent').innerHTML = html;
+    if (lastSearchQuery) performSearch();
+}
+
+function performSearch() {
+    const query = parseInt(document.getElementById('searchInput').value);
+    lastSearchQuery = document.getElementById('searchInput').value;
+    if (!query) return;
+    
+    const data = getData();
+    const results = [];
+    
+    data.classrooms.forEach(c => {
+        c.entries.forEach(e => {
+            if (e.isNI) return; // Skip NI entries in serial search
+            
+            let match = false;
+            if (e.isRange && e.rangeStart !== null && e.rangeEnd !== null) {
+                if (query >= e.rangeStart && query <= e.rangeEnd) match = true;
+            } else {
+                const entryVal = parseInt(e.li);
+                if (entryVal === query) match = true;
+            }
+            
+            if (match) {
+                results.push({ classroom: c, entry: e });
+            }
+        });
+    });
+    
+    let html = '';
+    if (results.length > 0) {
+        html += `<div style="margin-bottom:10px;font-size:14px;color:#30d158;font-weight:600;">✓ ${results.length} result(s) found</div>`;
+        results.forEach(r => {
+            const checked = r.entry.isChecked ? '✓ CHECKED' : 'NOT CHECKED';
+            const checkColor = r.entry.isChecked ? '#30d158' : '#ff9f0a';
+            html += `<div class="result-found">
+                <div style="font-size:12px;color:#8e8e93;margin-bottom:4px;">
+                    <span class="tag tag-class">${escapeHtml(r.classroom.name)}</span>
+                    <span class="tag tag-line">Line ${r.entry.lineNumber}</span>
+                </div>
+                <div style="font-size:18px;font-weight:600;margin-bottom:4px;">${escapeHtml(r.entry.articleCode)}</div>
+                <div style="font-size:16px;color:#0a84ff;margin-bottom:8px;">LI: ${escapeHtml(r.entry.li)}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="color:${checkColor};font-size:13px;font-weight:600;">${checked}</span>
+                    <button class="btn btn-secondary" style="width:auto;padding:8px 16px;margin:0;font-size:14px;" 
+                        onclick="toggleCheckFromSearch('${r.classroom.id}','${r.entry.id}')">
+                        ${r.entry.isChecked ? 'Uncheck' : 'Mark Checked'}
+                    </button>
+                </div>
+            </div>`;
+        });
+    } else {
+        html += `<div class="result-notfound">
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">Not Found</div>
+            <div style="color:#8e8e93;margin-bottom:15px;">Serial number <b>${query}</b> does not exist in any classroom.</div>
+            <button class="btn btn-secondary" onclick="openRegisterModal(${query})">+ Register as New Machine</button>
+        </div>`;
+    }
+    
+    document.getElementById('searchResults').innerHTML = html;
+}
+
+function toggleCheckFromSearch(classId, entryId) {
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === classId);
+    const entry = classroom.entries.find(e => e.id === entryId);
+    entry.isChecked = !entry.isChecked;
+    saveData(data);
+    performSearch();
+}
+
+function openRegisterModal(serial) {
+    const data = getData();
+    const select = document.getElementById('regClassroom');
+    select.innerHTML = '<option value="">Select Classroom...</option>';
+    data.classrooms.forEach(c => {
+        select.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
+    });
+    document.getElementById('regSerialDisplay').textContent = serial;
+    document.getElementById('regLI').value = serial;
+    openModal('registerModal');
+}
+
+function registerNewMachine() {
+    const classId = document.getElementById('regClassroom').value;
+    const line = parseInt(document.getElementById('regLine').value);
+    const code = document.getElementById('regCode').value.trim();
+    const li = document.getElementById('regLI').value;
+    
+    if (!classId || !line || !code) return alert('Fill all fields');
+    
+    const data = getData();
+    const classroom = data.classrooms.find(c => c.id === classId);
+    
+    classroom.entries.push({
+        id: generateId(),
+        lineNumber: line,
+        articleCode: code,
+        li: li,
+        isRange: false,
+        rangeStart: null,
+        rangeEnd: null,
+        isNI: false,
+        isChecked: true,
+        isNewlyRegistered: true,
+        registeredAt: Date.now()
+    });
+    
+    saveData(data);
+    closeModal('registerModal');
+    document.getElementById('regLine').value = '';
+    document.getElementById('regCode').value = '';
+    
+    // Switch to search and show confirmation
+    lastSearchQuery = li;
+    renderSearch();
+    setTimeout(performSearch, 100);
+}
+
+// ==================== NEW REGISTRATIONS TAB ====================
+function renderNewReg() {
+    setTitle('New Registrations');
+    const data = getData();
+    const newEntries = [];
+    
+    data.classrooms.forEach(c => {
+        c.entries.filter(e => e.isNewlyRegistered).forEach(e => {
+            newEntries.push({ classroom: c, entry: e });
+        });
+    });
+    
+    // Sort by registration date, newest first
+    newEntries.sort((a,b) => (b.entry.registeredAt || 0) - (a.entry.registeredAt || 0));
+    
+    let html = '';
+    if (newEntries.length === 0) {
+        html = `<div class="empty-state">
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No New Registrations</div>
+            <div>Machines you register from the Search tab will appear here</div>
+        </div>`;
+    } else {
+        html += `<div style="margin-bottom:15px;color:#8e8e93;font-size:14px;">${newEntries.length} newly registered machine(s)</div>`;
+        newEntries.forEach(r => {
+            const date = r.entry.registeredAt ? new Date(r.entry.registeredAt).toLocaleDateString() : 'Unknown';
+            html += `<div class="entry-row">
+                <div class="entry-info">
+                    <div class="entry-line">${escapeHtml(r.classroom.name)} • Line ${r.entry.lineNumber} • ${date}</div>
+                    <div class="entry-code">${escapeHtml(r.entry.articleCode)} <span class="entry-badge badge-new">NEW</span></div>
+                    <div class="entry-li">${escapeHtml(r.entry.li)}</div>
+                </div>
+            </div>`;
+        });
+    }
+    
+    document.getElementById('mainContent').innerHTML = html;
+}
+
+// ==================== UTILS ====================
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Close modals on outside click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', (e) => {
+        if (e.target === m) m.classList.remove('active');
+    });
+});
+
+// Init
+renderLists();
+
+// Register service worker for offline
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
