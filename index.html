@@ -644,7 +644,7 @@ function logout() {
 let db = null;
 let isOnline = false;
 let syncInProgress = false;
-const DEVICE_ID = 'device_' + Math.random().toString(36).substr(2, 9);
+const DEVICE_ID = 'DEV </> CHAKIR | DEVICE_' + Math.random().toString(36).substr(2, 9);
 const LOCAL_KEY = 'machine_manager_data_v2';
 const LAST_SYNC_KEY = 'machine_manager_last_sync';
 
@@ -1144,7 +1144,7 @@ function performSearch() {
     
     data.classrooms.forEach(c => {
         c.entries.forEach(e => {
-            if (e.isNI) return;
+            
             
             let match = false;
             if (e.isRange && e.rangeStart !== null && e.rangeEnd !== null) {
