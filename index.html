@@ -10,7 +10,6 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a84ff'/%3E%3Ctext x='50' y='65' font-size='45' text-anchor='middle' fill='white'%3E%26%23x2699%3B%3C/text%3E%3C/svg%3E">
     
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
@@ -140,7 +139,7 @@
             margin-bottom: 10px;
             outline: none;
         }
-        .textarea { min-height: 150px; font-family: monospace; font-size: 13px; }
+        .textarea { min-height: 120px; font-family: -apple-system, sans-serif; font-size: 15px; }
         
         .entry-row {
             background: #1c1c1e;
@@ -151,11 +150,22 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
         }
-        .entry-info { flex: 1; }
+        .entry-row:active { background: #2c2c2e; }
+        .entry-info { flex: 1; min-width: 0; }
         .entry-line { font-size: 12px; color: #8e8e93; margin-bottom: 2px; }
         .entry-code { font-size: 15px; font-weight: 500; }
         .entry-li { font-size: 14px; color: #0a84ff; margin-top: 2px; }
+        .entry-desc-preview {
+            font-size: 12px;
+            color: #64d2ff;
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
         .entry-badge {
             font-size: 10px;
             padding: 3px 8px;
@@ -163,6 +173,7 @@
             font-weight: 600;
             text-transform: uppercase;
             margin-left: 8px;
+            flex-shrink: 0;
         }
         .badge-new { background: #0a84ff; color: white; }
         .badge-ni { background: #ff9f0a; color: black; }
@@ -180,10 +191,27 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-left: 10px;
+            margin-left: 8px;
             flex-shrink: 0;
         }
         .check-btn.checked { background: #30d158; color: black; }
+        
+        .desc-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #64d2ff;
+            background: transparent;
+            color: #64d2ff;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+        .desc-btn.has-desc { background: #64d2ff; color: black; }
         
         .search-box {
             position: sticky;
@@ -206,7 +234,9 @@
             padding: 15px;
             border-radius: 0 12px 12px 0;
             margin-bottom: 10px;
+            cursor: pointer;
         }
+        .result-found:active { background: #2c2c2e; }
         .result-notfound {
             background: #1c1c1e;
             border-left: 4px solid #ff453a;
@@ -218,7 +248,7 @@
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             display: none;
             align-items: flex-end;
             justify-content: center;
@@ -226,6 +256,7 @@
             backdrop-filter: blur(5px);
         }
         .modal-overlay.active { display: flex; }
+        .modal-overlay.centered { align-items: center; }
         .modal-sheet {
             background: #1c1c1e;
             width: 100%;
@@ -234,6 +265,12 @@
             padding: 20px;
             overflow-y: auto;
             animation: slideUp 0.3s ease;
+        }
+        .modal-sheet.centered {
+            border-radius: 20px;
+            max-width: 400px;
+            margin: 20px;
+            max-height: 80vh;
         }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .modal-header {
@@ -289,17 +326,6 @@
             align-items: center;
         }
         
-        .share-link-box {
-            background: #2c2c2e;
-            border-radius: 10px;
-            padding: 12px;
-            margin: 10px 0;
-            word-break: break-all;
-            font-family: monospace;
-            font-size: 12px;
-            color: #0a84ff;
-        }
-        
         .toast {
             position: fixed;
             top: 60px;
@@ -319,44 +345,138 @@
             opacity: 1;
         }
         .toast.error { background: #ff453a; color: white; }
+        
+        .auth-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 30px;
+            background: #000;
+        }
+        .auth-logo {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .auth-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .auth-sub {
+            color: #8e8e93;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .auth-input {
+            width: 100%;
+            max-width: 300px;
+            background: #1c1c1e;
+            border: 1px solid #3a3a3c;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 15px;
+            outline: none;
+        }
+        .auth-input:focus { border-color: #0a84ff; }
+        .auth-btn {
+            width: 100%;
+            max-width: 300px;
+            background: #0a84ff;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .auth-error {
+            color: #ff453a;
+            margin-top: 15px;
+            font-size: 14px;
+            display: none;
+        }
+        .auth-error.show { display: block; }
+        
+        .desc-display {
+            background: #2c2c2e;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #e0e0e0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 60px;
+        }
+        .desc-display.empty {
+            color: #8e8e93;
+            font-style: italic;
+        }
+        
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .action-row .btn { margin-top: 0; flex: 1; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div class="sync-indicator offline" id="syncIndicator"></div>
-    <span id="pageTitle">Lists</span>
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="auth-screen">
+    <div class="auth-logo">⚙️</div>
+    <div class="auth-title">Machine List Manager</div>
+    <div class="auth-sub">Enter your workspace password to continue</div>
+    <input type="password" class="auth-input" id="authPassword" placeholder="Password" onkeyup="if(event.key==='Enter')doAuth()">
+    <button class="auth-btn" onclick="doAuth()">Unlock</button>
+    <div class="auth-error" id="authError">Incorrect password</div>
 </div>
 
-<div class="sync-status-bar" id="syncStatus">
-    <span id="syncText">Initializing...</span>
-    <span id="deviceId" style="font-size:10px;opacity:0.5;"></span>
-</div>
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none;flex-direction:column;height:100vh;">
+    <div class="header">
+        <div class="sync-indicator offline" id="syncIndicator"></div>
+        <span id="pageTitle">Lists</span>
+    </div>
 
-<div class="content" id="mainContent"></div>
+    <div class="sync-status-bar" id="syncStatus">
+        <span id="syncText">Initializing...</span>
+        <span id="deviceId" style="font-size:10px;opacity:0.5;"></span>
+    </div>
 
-<div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('lists')">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        Lists
-    </button>
-    <button class="tab-btn" onclick="switchTab('search')">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        Search
-    </button>
-    <button class="tab-btn" onclick="switchTab('newreg')">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        New Reg.
-    </button>
-    <button class="tab-btn" onclick="switchTab('settings')">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        Sync
-    </button>
+    <div class="content" id="mainContent"></div>
+
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('lists')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            Lists
+        </button>
+        <button class="tab-btn" onclick="switchTab('search')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            Search
+        </button>
+        <button class="tab-btn" onclick="switchTab('newreg')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            New Reg.
+        </button>
+        <button class="tab-btn" onclick="switchTab('settings')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Sync
+        </button>
+    </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<!-- Modals -->
+<!-- MODALS -->
 <div class="modal-overlay" id="addClassModal">
     <div class="modal-sheet">
         <div class="modal-header">
@@ -377,6 +497,7 @@
         <input type="number" class="input" id="entryLine" placeholder="Line Number">
         <input type="text" class="input" id="entryCode" placeholder="Article Code">
         <input type="text" class="input" id="entryLI" placeholder="LI / Serial">
+        <textarea class="textarea" id="entryDesc" placeholder="Description (optional) - e.g. BUREAU MINISTRE SEMI-METALLIQUE 2 CAISSONS 6 TIROIRS"></textarea>
         <label style="display:flex;align-items:center;gap:8px;margin-bottom:15px;color:#8e8e93;font-size:14px;">
             <input type="checkbox" id="entryNI" style="width:20px;height:20px;"> Mark as "NI"
         </label>
@@ -391,8 +512,8 @@
             <button class="modal-close" onclick="closeModal('importModal')">×</button>
         </div>
         <div class="info-box">
-            Format: <b>LineNumber,ArticleCode,LI</b><br>
-            1,5110013,2767<br>2,5110286,3167<br>4,5110101,1564-1570
+            Format: <b>LineNumber,ArticleCode,LI,Description</b> (Description optional)<br>
+            1,5110013,2767,BUREAU MINISTRE<br>2,5110286,3167<br>4,5110101,1564-1570
         </div>
         <textarea class="textarea" id="importData" placeholder="Paste CSV here..."></textarea>
         <button class="btn btn-secondary" onclick="importCSV()">Import Data</button>
@@ -409,49 +530,151 @@
         <select class="input" id="regClassroom"><option value="">Select Classroom...</option></select>
         <input type="number" class="input" id="regLine" placeholder="Line Number">
         <input type="text" class="input" id="regCode" placeholder="Article Code">
+        <textarea class="textarea" id="regDesc" placeholder="Description (optional)"></textarea>
         <input type="hidden" id="regLI">
         <button class="btn btn-secondary" onclick="registerNewMachine()">Register as New</button>
     </div>
 </div>
 
+<div class="modal-overlay" id="descModal">
+    <div class="modal-sheet">
+        <div class="modal-header">
+            <div class="modal-title">Machine Details</div>
+            <button class="modal-close" onclick="closeModal('descModal')">×</button>
+        </div>
+        <div id="descContent"></div>
+        <div class="action-row">
+            <button class="btn btn-gray" onclick="closeModal('descModal')" style="flex:1;">Close</button>
+            <button class="btn" onclick="editCurrentDesc()" style="flex:1;">Edit Description</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="editDescModal">
+    <div class="modal-sheet">
+        <div class="modal-header">
+            <div class="modal-title">Edit Description</div>
+            <button class="modal-close" onclick="closeModal('editDescModal')">×</button>
+        </div>
+        <textarea class="textarea" id="editDescText" placeholder="Enter description..."></textarea>
+        <div class="action-row">
+            <button class="btn btn-gray" onclick="closeModal('editDescModal')" style="flex:1;">Cancel</button>
+            <button class="btn btn-secondary" onclick="saveDescEdit()" style="flex:1;">Save</button>
+        </div>
+    </div>
+</div>
+
 <script>
+// ==================== EMBEDDED FIREBASE CONFIG ====================
+// ⚠️ EDIT THESE VALUES WITH YOUR ACTUAL FIREBASE CREDENTIALS BEFORE UPLOADING!
+// Find them in: Firebase Console → Project Settings → General → Your apps → Web
+const EMBEDDED_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAmJ6bsZAS1WYGNKVnWZgk5T2sWNkSfCH8",  // ← REPLACE THIS
+    projectId: "machine-lists-manager",  // ← REPLACE THIS
+    databaseURL: "https://machine-lists-manager-default-rtdb.europe-west1.firebasedatabase.app/"  // ← REPLACE THIS
+};
+
+// ==================== SECURITY & AUTH ====================
+const AUTH_KEY = 'mla_auth';
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// CHANGE THIS TO YOUR OWN PASSWORD BEFORE DEPLOYING!
+const DEFAULT_PASSWORD = "ofppt2024";  // ⚠️ CHANGE THIS!
+
+function hashPassword(pwd) {
+    let hash = 0;
+    for (let i = 0; i < pwd.length; i++) {
+        const char = pwd.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash.toString(16);
+}
+
+function checkAuth() {
+    const session = localStorage.getItem(AUTH_KEY);
+    if (session) {
+        try {
+            const data = JSON.parse(session);
+            if (data.expires > Date.now()) {
+                showMainApp();
+                return true;
+            }
+        } catch(e) {}
+    }
+    showAuthScreen();
+    return false;
+}
+
+function doAuth() {
+    const pwd = document.getElementById('authPassword').value;
+    const errorEl = document.getElementById('authError');
+    
+    if (hashPassword(pwd) === hashPassword(DEFAULT_PASSWORD)) {
+        localStorage.setItem(AUTH_KEY, JSON.stringify({
+            expires: Date.now() + SESSION_DURATION,
+            device: DEVICE_ID
+        }));
+        errorEl.classList.remove('show');
+        showMainApp();
+    } else {
+        errorEl.classList.add('show');
+        document.getElementById('authPassword').value = '';
+        document.getElementById('authPassword').focus();
+    }
+}
+
+function showAuthScreen() {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+}
+
+function showMainApp() {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+    initApp();
+}
+
+function logout() {
+    localStorage.removeItem(AUTH_KEY);
+    location.reload();
+}
+
 // ==================== GLOBAL STATE ====================
 let db = null;
 let isOnline = false;
 let syncInProgress = false;
-const DEVICE_ID = 'DEV : CHAKIR | Device_id_' + Math.random().toString(36).substr(2, 9);
-const LOCAL_KEY = 'machine_manager_data';
+const DEVICE_ID = 'device_' + Math.random().toString(36).substr(2, 9);
+const LOCAL_KEY = 'machine_manager_data_v2';
 const LAST_SYNC_KEY = 'machine_manager_last_sync';
-const FIREBASE_CONFIG_KEY = 'firebase_config_v2';
 
 let currentTab = 'lists';
 let currentClassroomId = null;
 let lastSearchQuery = '';
+let currentDescTarget = null;
 
 // ==================== FIREBASE INIT ====================
 function initFirebase() {
-    const saved = localStorage.getItem(FIREBASE_CONFIG_KEY);
-    if (!saved) {
-        updateSyncStatus('offline', 'Firebase not configured - go to Sync tab');
+    const cfg = EMBEDDED_FIREBASE_CONFIG;
+    
+    if (!cfg.apiKey || cfg.apiKey.includes('XXXX')) {
+        updateSyncStatus('offline', 'Firebase not configured - edit code');
         return false;
     }
     
     try {
-        const cfg = JSON.parse(saved);
-        
-        // Check if already initialized
         if (firebase.apps.length > 0) {
             firebase.apps.forEach(app => app.delete());
         }
         
         const config = {
             apiKey: cfg.apiKey,
-            authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com'),
+            authDomain: cfg.projectId + '.firebaseapp.com',
             databaseURL: cfg.databaseURL,
             projectId: cfg.projectId,
-            storageBucket: cfg.storageBucket || (cfg.projectId + '.appspot.com'),
-            messagingSenderId: cfg.messagingSenderId || '000000000000',
-            appId: cfg.appId || '1:000000000000:web:0000000000000000000000'
+            storageBucket: cfg.projectId + '.appspot.com',
+            messagingSenderId: '000000000000',
+            appId: '1:000000000000:web:0000000000000000000000'
         };
         
         firebase.initializeApp(config);
@@ -463,7 +686,7 @@ function initFirebase() {
         
     } catch(e) {
         console.error('Firebase init error:', e);
-        updateSyncStatus('offline', 'Config error: ' + e.message);
+        updateSyncStatus('offline', 'Connection error');
         return false;
     }
 }
@@ -514,13 +737,11 @@ function generateId() {
 function setupSyncListeners() {
     if (!db) return;
     
-    // Connection state
     const connectedRef = db.ref('.info/connected');
     connectedRef.on('value', (snap) => {
         isOnline = snap.val() === true;
         if (isOnline) {
             updateSyncStatus('online', 'Connected - syncing...');
-            // Delay slightly to ensure connection is stable
             setTimeout(() => {
                 pullFromCloud().then(() => pushToCloud());
             }, 500);
@@ -529,7 +750,6 @@ function setupSyncListeners() {
         }
     });
     
-    // Listen for remote changes
     db.ref('machines').on('value', (snapshot) => {
         if (!snapshot.exists()) return;
         const cloudData = snapshot.val().data;
@@ -543,7 +763,6 @@ function setupSyncListeners() {
         }
     });
     
-    // Periodic sync
     setInterval(() => {
         if (isOnline && !syncInProgress) pushToCloud();
     }, 30000);
@@ -564,8 +783,7 @@ async function pushToCloud() {
         localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
         updateSyncStatus('online', 'Synced to cloud');
     } catch(e) {
-        console.error('Push error:', e);
-        updateSyncStatus('offline', 'Sync failed: ' + e.message);
+        updateSyncStatus('offline', 'Sync failed');
     }
     syncInProgress = false;
 }
@@ -581,7 +799,6 @@ async function pullFromCloud() {
         
         if (cloudData && cloudData.classrooms) {
             const localData = getLocalData();
-            
             if (!localData.lastModified || (cloudData.lastModified > localData.lastModified && cloudData.lastModifiedBy !== DEVICE_ID)) {
                 localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
                 showToast('Downloaded from cloud!');
@@ -590,15 +807,14 @@ async function pullFromCloud() {
         }
         updateSyncStatus('online', 'Connected');
     } catch(e) {
-        console.error('Pull error:', e);
-        updateSyncStatus('offline', 'Fetch failed: ' + e.message);
+        updateSyncStatus('offline', 'Fetch failed');
     }
     syncInProgress = false;
 }
 
 function forceSync() {
     if (!db) {
-        showToast('Firebase not configured! Enter details in Sync tab.', true);
+        showToast('Firebase not configured', true);
         return;
     }
     if (!isOnline) {
@@ -651,7 +867,7 @@ function renderLists() {
     
     html += `<button class="btn" onclick="openModal('addClassModal')">+ Add Classroom</button>`;
     html += `<button class="btn btn-gray" onclick="exportAllData()" style="margin-top:8px;">📤 Export Backup</button>`;
-    html += `<button class="btn btn-danger" onclick="if(confirm('Delete ALL data?')){localStorage.removeItem(LOCAL_KEY);localStorage.removeItem(LAST_SYNC_KEY);pushToCloud();renderLists();}" style="margin-top:8px;background:#3a3a3c;">Reset All Data</button>`;
+    html += `<button class="btn btn-danger" onclick="if(confirm('Delete ALL data?')){localStorage.removeItem(LOCAL_KEY);pushToCloud();renderLists();}" style="margin-top:8px;background:#3a3a3c;">Reset All Data</button>`;
     
     document.getElementById('mainContent').innerHTML = html;
 }
@@ -700,15 +916,20 @@ function renderClassroomDetail() {
             const niBadge = entry.isNI ? `<span class="entry-badge badge-ni">NI</span>` : '';
             const newBadge = entry.isNewlyRegistered ? `<span class="entry-badge badge-new">NEW</span>` : '';
             const checkedClass = entry.isChecked ? 'checked' : '';
+            const descPreview = entry.description ? `<div class="entry-desc-preview">${escapeHtml(entry.description)}</div>` : '';
+            const descBtnClass = entry.description ? 'has-desc' : '';
+            const descIcon = entry.description ? '📝' : '＋';
             
-            html += `<div class="entry-row">
+            html += `<div class="entry-row" onclick="showDescription('${classroom.id}','${entry.id}')">
                 <div class="entry-info">
                     <div class="entry-line">Line ${entry.lineNumber}</div>
                     <div class="entry-code">${escapeHtml(entry.articleCode)} ${niBadge}${rangeBadge}${newBadge}</div>
                     <div class="entry-li">${escapeHtml(entry.li)}</div>
+                    ${descPreview}
                 </div>
+                <button class="desc-btn ${descBtnClass}" onclick="event.stopPropagation();showDescription('${classroom.id}','${entry.id}')">${descIcon}</button>
                 <button class="check-btn ${checkedClass}" onclick="event.stopPropagation();toggleCheck('${classroom.id}','${entry.id}')">✓</button>
-                <button class="delete-btn" onclick="event.stopPropagation();deleteEntry('${classroom.id}','${entry.id}')" style="margin-left:8px;">Del</button>
+                <button class="delete-btn" onclick="event.stopPropagation();deleteEntry('${classroom.id}','${entry.id}')" style="margin-left:6px;">Del</button>
             </div>`;
         });
     }
@@ -721,6 +942,7 @@ function addEntry() {
     const line = parseInt(document.getElementById('entryLine').value);
     const code = document.getElementById('entryCode').value.trim();
     const li = document.getElementById('entryLI').value.trim();
+    const desc = document.getElementById('entryDesc').value.trim();
     const isNI = document.getElementById('entryNI').checked;
     
     if (!line || !code || !li) return alert('Fill all fields');
@@ -740,6 +962,7 @@ function addEntry() {
         lineNumber: line,
         articleCode: code,
         li: li,
+        description: desc,
         isRange: isRange,
         rangeStart: rangeStart,
         rangeEnd: rangeEnd,
@@ -755,6 +978,7 @@ function addEntry() {
     document.getElementById('entryLine').value = '';
     document.getElementById('entryCode').value = '';
     document.getElementById('entryLI').value = '';
+    document.getElementById('entryDesc').value = '';
     document.getElementById('entryNI').checked = false;
     renderClassroomDetail();
 }
@@ -763,7 +987,8 @@ function importCSV() {
     const raw = document.getElementById('importData').value.trim();
     if (!raw) return;
     
-    const lines = raw.split('\n');
+    const lines = raw.split('
+');
     const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === currentClassroomId);
     let added = 0;
@@ -775,6 +1000,7 @@ function importCSV() {
         const lineNum = parseInt(parts[0]);
         const code = parts[1];
         const li = parts[2];
+        const desc = parts[3] || '';
         
         if (!lineNum || !code || !li) return;
         
@@ -792,6 +1018,7 @@ function importCSV() {
             lineNumber: lineNum,
             articleCode: isNI ? 'NI' : code,
             li: li,
+            description: desc,
             isRange: isRange,
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
@@ -829,6 +1056,70 @@ function deleteEntry(classId, entryId) {
     saveLocalData(data);
     pushToCloud();
     renderClassroomDetail();
+}
+
+// ==================== DESCRIPTION SYSTEM ====================
+function showDescription(classId, entryId) {
+    const data = getLocalData();
+    const classroom = data.classrooms.find(c => c.id === classId);
+    const entry = classroom.entries.find(e => e.id === entryId);
+    
+    currentDescTarget = { classId, entryId };
+    
+    const descHtml = entry.description 
+        ? `<div class="desc-display">${escapeHtml(entry.description)}</div>`
+        : `<div class="desc-display empty">No description added yet. Tap Edit to add one.</div>`;
+    
+    const badges = [];
+    if (entry.isNI) badges.push('<span class="entry-badge badge-ni">NI</span>');
+    if (entry.isRange) badges.push('<span class="entry-badge badge-ni">RANGE</span>');
+    if (entry.isNewlyRegistered) badges.push('<span class="entry-badge badge-new">NEW</span>');
+    if (entry.isChecked) badges.push('<span class="entry-badge badge-checked">CHECKED</span>');
+    
+    document.getElementById('descContent').innerHTML = `
+        <div style="margin-bottom:15px;">
+            <div style="font-size:12px;color:#8e8e93;margin-bottom:4px;">
+                <span class="tag tag-class">${escapeHtml(classroom.name)}</span>
+                <span class="tag tag-line">Line ${entry.lineNumber}</span>
+            </div>
+            <div style="font-size:20px;font-weight:700;margin-bottom:4px;">${escapeHtml(entry.articleCode)} ${badges.join('')}</div>
+            <div style="font-size:18px;color:#0a84ff;margin-bottom:10px;">LI: ${escapeHtml(entry.li)}</div>
+        </div>
+        <div style="font-size:13px;color:#8e8e93;margin-bottom:5px;">Description:</div>
+        ${descHtml}
+    `;
+    
+    openModal('descModal');
+}
+
+function editCurrentDesc() {
+    if (!currentDescTarget) return;
+    const data = getLocalData();
+    const classroom = data.classrooms.find(c => c.id === currentDescTarget.classId);
+    const entry = classroom.entries.find(e => e.id === currentDescTarget.entryId);
+    
+    document.getElementById('editDescText').value = entry.description || '';
+    closeModal('descModal');
+    setTimeout(() => openModal('editDescModal'), 300);
+}
+
+function saveDescEdit() {
+    if (!currentDescTarget) return;
+    const newDesc = document.getElementById('editDescText').value.trim();
+    
+    const data = getLocalData();
+    const classroom = data.classrooms.find(c => c.id === currentDescTarget.classId);
+    const entry = classroom.entries.find(e => e.id === currentDescTarget.entryId);
+    
+    entry.description = newDesc;
+    saveLocalData(data);
+    pushToCloud();
+    
+    closeModal('editDescModal');
+    showToast('Description saved!');
+    
+    if (currentTab === 'lists') renderClassroomDetail();
+    else if (currentTab === 'search') performSearch();
 }
 
 // ==================== SEARCH TAB ====================
@@ -874,17 +1165,22 @@ function performSearch() {
         results.forEach(r => {
             const checked = r.entry.isChecked ? '✓ CHECKED' : 'NOT CHECKED';
             const checkColor = r.entry.isChecked ? '#30d158' : '#ff9f0a';
-            html += `<div class="result-found">
+            const descPreview = r.entry.description 
+                ? `<div style="font-size:12px;color:#64d2ff;margin-top:4px;">${escapeHtml(r.entry.description.substring(0, 60))}${r.entry.description.length > 60 ? '...' : ''}</div>`
+                : '';
+            
+            html += `<div class="result-found" onclick="showDescription('${r.classroom.id}','${r.entry.id}')">
                 <div style="font-size:12px;color:#8e8e93;margin-bottom:4px;">
                     <span class="tag tag-class">${escapeHtml(r.classroom.name)}</span>
                     <span class="tag tag-line">Line ${r.entry.lineNumber}</span>
                 </div>
                 <div style="font-size:18px;font-weight:600;margin-bottom:4px;">${escapeHtml(r.entry.articleCode)}</div>
-                <div style="font-size:16px;color:#0a84ff;margin-bottom:8px;">LI: ${escapeHtml(r.entry.li)}</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:16px;color:#0a84ff;margin-bottom:4px;">LI: ${escapeHtml(r.entry.li)}</div>
+                ${descPreview}
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
                     <span style="color:${checkColor};font-size:13px;font-weight:600;">${checked}</span>
                     <button class="btn btn-secondary" style="width:auto;padding:8px 16px;margin:0;font-size:14px;" 
-                        onclick="toggleCheckFromSearch('${r.classroom.id}','${r.entry.id}')">
+                        onclick="event.stopPropagation();toggleCheckFromSearch('${r.classroom.id}','${r.entry.id}')">
                         ${r.entry.isChecked ? 'Uncheck' : 'Mark Checked'}
                     </button>
                 </div>
@@ -920,6 +1216,7 @@ function openRegisterModal(serial) {
     });
     document.getElementById('regSerialDisplay').textContent = serial;
     document.getElementById('regLI').value = serial;
+    document.getElementById('regDesc').value = '';
     openModal('registerModal');
 }
 
@@ -928,6 +1225,7 @@ function registerNewMachine() {
     const line = parseInt(document.getElementById('regLine').value);
     const code = document.getElementById('regCode').value.trim();
     const li = document.getElementById('regLI').value;
+    const desc = document.getElementById('regDesc').value.trim();
     
     if (!classId || !line || !code) return alert('Fill all fields');
     
@@ -939,6 +1237,7 @@ function registerNewMachine() {
         lineNumber: line,
         articleCode: code,
         li: li,
+        description: desc,
         isRange: false,
         rangeStart: null,
         rangeEnd: null,
@@ -953,6 +1252,7 @@ function registerNewMachine() {
     closeModal('registerModal');
     document.getElementById('regLine').value = '';
     document.getElementById('regCode').value = '';
+    document.getElementById('regDesc').value = '';
     
     lastSearchQuery = li;
     renderSearch();
@@ -983,11 +1283,15 @@ function renderNewReg() {
         html += `<div style="margin-bottom:15px;color:#8e8e93;font-size:14px;">${newEntries.length} newly registered</div>`;
         newEntries.forEach(r => {
             const date = r.entry.registeredAt ? new Date(r.entry.registeredAt).toLocaleDateString() : 'Unknown';
-            html += `<div class="entry-row">
+            const descPreview = r.entry.description 
+                ? `<div style="font-size:12px;color:#64d2ff;margin-top:3px;">${escapeHtml(r.entry.description.substring(0, 50))}...</div>`
+                : '';
+            html += `<div class="entry-row" onclick="showDescription('${r.classroom.id}','${r.entry.id}')">
                 <div class="entry-info">
                     <div class="entry-line">${escapeHtml(r.classroom.name)} • Line ${r.entry.lineNumber} • ${date}</div>
                     <div class="entry-code">${escapeHtml(r.entry.articleCode)} <span class="entry-badge badge-new">NEW</span></div>
                     <div class="entry-li">${escapeHtml(r.entry.li)}</div>
+                    ${descPreview}
                 </div>
             </div>`;
         });
@@ -1003,8 +1307,6 @@ function renderSettings() {
     const data = getLocalData();
     const totalMachines = data.classrooms.reduce((sum, c) => sum + c.entries.length, 0);
     const totalChecked = data.classrooms.reduce((sum, c) => sum + c.entries.filter(e => e.isChecked).length, 0);
-    const savedCfg = localStorage.getItem(FIREBASE_CONFIG_KEY);
-    const isConfigured = savedCfg !== null;
     
     let html = `
         <div class="card">
@@ -1013,36 +1315,17 @@ function renderSettings() {
         </div>
         
         <div class="card">
-            <div class="card-title">Firebase Configuration</div>
+            <div class="card-title">Sync Status</div>
             <div class="card-sub" style="margin-bottom:10px;">
-                ${isConfigured ? '✅ Configured' : '❌ Not configured'}
-            </div>`;
-    
-    if (!isConfigured) {
-        html += `
-            <div class="info-box">
-                <b>How to get your Firebase config:</b><br>
-                1. Go to firebase.google.com → Console<br>
-                2. Click ⚙️ Project Settings<br>
-                3. Scroll to "Your apps" → click &lt;/&gt; (Web)<br>
-                4. Copy the values below
-            </div>
-            <input type="text" class="input" id="fbApiKey" placeholder="API Key">
-            <input type="text" class="input" id="fbProjectId" placeholder="Project ID">
-            <input type="text" class="input" id="fbDatabaseUrl" placeholder="Database URL">
-            <button class="btn btn-secondary" onclick="saveFirebaseConfig()">Save & Connect</button>`;
-    } else {
-        const cfg = JSON.parse(savedCfg);
-        html += `
-            <div class="info-box">
-                Project: <b>${escapeHtml(cfg.projectId)}</b><br>
-                Database: <b>${escapeHtml(cfg.databaseURL)}</b>
+                ${db ? '✅ Firebase Connected' : '❌ Firebase Not Connected'}
             </div>
             <button class="btn" onclick="forceSync()">🔄 Force Sync Now</button>
-            <button class="btn btn-danger" onclick="clearFirebaseConfig()" style="margin-top:8px;">Disconnect Firebase</button>`;
-    }
-    
-    html += `</div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">Security</div>
+            <button class="btn btn-gray" onclick="logout()">🔒 Lock App / Logout</button>
+        </div>
         
         <div class="card">
             <div class="card-title">Data Management</div>
@@ -1052,52 +1335,6 @@ function renderSettings() {
     `;
     
     document.getElementById('mainContent').innerHTML = html;
-}
-
-function saveFirebaseConfig() {
-    const apiKey = document.getElementById('fbApiKey').value.trim();
-    const projectId = document.getElementById('fbProjectId').value.trim();
-    const databaseURL = document.getElementById('fbDatabaseUrl').value.trim();
-    
-    if (!apiKey || !projectId || !databaseURL) {
-        showToast('Fill all Firebase fields', true);
-        return;
-    }
-    
-    const config = {
-        apiKey: apiKey,
-        projectId: projectId,
-        databaseURL: databaseURL,
-        authDomain: projectId + '.firebaseapp.com',
-        storageBucket: projectId + '.appspot.com'
-    };
-    
-    localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config));
-    showToast('Config saved! Connecting...');
-    
-    // Try to init immediately
-    setTimeout(() => {
-        if (initFirebase()) {
-            showToast('Connected to Firebase!');
-            renderSettings();
-        } else {
-            showToast('Connection failed. Check your config.', true);
-        }
-    }, 500);
-}
-
-function clearFirebaseConfig() {
-    if (!confirm('Disconnect from Firebase? Local data will be kept.')) return;
-    localStorage.removeItem(FIREBASE_CONFIG_KEY);
-    if (db) {
-        db.goOffline();
-        db = null;
-    }
-    firebase.apps.forEach(app => app.delete());
-    isOnline = false;
-    updateSyncStatus('offline', 'Disconnected');
-    showToast('Firebase disconnected');
-    renderSettings();
 }
 
 function exportAllData() {
@@ -1134,17 +1371,16 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 });
 
 // ==================== INIT ====================
-document.getElementById('deviceId').textContent = DEVICE_ID;
-
-// Try to init Firebase on load
-initFirebase();
-
-// If not configured, show offline status
-if (!db) {
-    updateSyncStatus('offline', 'Tap Sync tab to configure Firebase');
+function initApp() {
+    initFirebase();
+    if (!db) {
+        updateSyncStatus('offline', 'Check Firebase config in code');
+    }
+    renderLists();
 }
 
-renderLists();
+// Check auth on load
+checkAuth();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
