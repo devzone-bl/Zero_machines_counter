@@ -579,7 +579,7 @@ const AUTH_KEY = 'mla_auth';
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 // CHANGE THIS TO YOUR OWN PASSWORD BEFORE DEPLOYING!
-const DEFAULT_PASSWORD = "ofppt2024";  // ⚠️ CHANGE THIS!
+const DEFAULT_PASSWORD = "ofppt";  
 
 function hashPassword(pwd) {
     let hash = 0;
@@ -613,7 +613,7 @@ function doAuth() {
     if (hashPassword(pwd) === hashPassword(DEFAULT_PASSWORD)) {
         localStorage.setItem(AUTH_KEY, JSON.stringify({
             expires: Date.now() + SESSION_DURATION,
-            device: DEVICE_ID
+            device: 'auth_device'
         }));
         errorEl.classList.remove('show');
         showMainApp();
@@ -632,7 +632,7 @@ function showAuthScreen() {
 function showMainApp() {
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'flex';
-    initApp();
+    setTimeout(initApp, 100);
 }
 
 function logout() {
@@ -987,8 +987,7 @@ function importCSV() {
     const raw = document.getElementById('importData').value.trim();
     if (!raw) return;
     
-    const lines = raw.split('
-');
+        const lines = raw.split('\n');
     const data = getLocalData();
     const classroom = data.classrooms.find(c => c.id === currentClassroomId);
     let added = 0;
